@@ -8,8 +8,9 @@ import { EditCourseModal } from './components/EditCourseModal';
 import { DataManagementModal } from './components/DataManagementModal';
 import { StatsCard } from './components/StatsCard';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
+import { AiAdvisor } from './components/AiAdvisor';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles } from 'lucide-react';
+import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon } from 'lucide-react';
 
 const COLORS = ['#10B981', '#005BAC', '#F59E0B', '#EF4444', '#6B7280'];
 const STORAGE_KEY = 'dlut_gpa_courses_v3';
@@ -446,7 +447,7 @@ function App() {
                     </ResponsiveContainer>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
-                        <PieChart size={32} className="opacity-20" />
+                        <PieChartIcon size={32} className="opacity-20" />
                         请勾选课程以查看分布
                     </div>
                 )}
@@ -464,7 +465,7 @@ function App() {
 
             {/* Other Charts */}
             <AnalysisDashboard courses={activeCourses} />
-
+            <AiAdvisor courses={activeCourses} stats={stats} />
           </div>
         </div>
       </main>

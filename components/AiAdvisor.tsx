@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Loader2, BrainCircuit } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { Course, GpaStats } from '../types';
 import { getAcademicAdvice } from '../services/geminiService';
 
@@ -12,7 +12,7 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
   const [loading, setLoading] = useState(false);
   const [advice, setAdvice] = useState<{ analysis: string; suggestions: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
+  
   const handleGenerateAdvice = async () => {
     if (courses.length === 0) {
       setError("请先添加一些课程。");
@@ -25,21 +25,11 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
       const result = await getAcademicAdvice(courses, stats);
       setAdvice(result);
     } catch (err) {
-      setError("当前无法生成建议。请检查您的API密钥或稍后再试。");
+      setError("当前无法生成建议。请稍后再试。");
     } finally {
       setLoading(false);
     }
   };
-
-  if (!process.env.API_KEY) {
-    return (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-2xl border border-indigo-100 text-center">
-             <BrainCircuit className="mx-auto h-12 w-12 text-indigo-300 mb-3" />
-             <h3 className="text-lg font-semibold text-indigo-900">AI 导师不可用</h3>
-             <p className="text-indigo-600 text-sm mt-2">环境配置中缺少 API 密钥。</p>
-        </div>
-    )
-  }
 
   return (
     <div className="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-6 rounded-2xl shadow-xl overflow-hidden relative">

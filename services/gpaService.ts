@@ -46,15 +46,25 @@ export const calculateCourseGpa = (score: number, method: CalculationMethod): nu
 };
 
 export const calculateStats = (courses: Course[]): GpaStats => {
-  const totalCredits = courses.reduce((sum, course) => sum + course.credits, 0);
-  
-  // Calculate Weighted GPA Points
-  const totalGpaPoints = courses.reduce((sum, course) => sum + (course.gpa * course.credits), 0);
-  const weightedGpa = totalCredits > 0 ? Number((totalGpaPoints / totalCredits).toFixed(3)) : 0.000;
+  // Helper for weighted calculations
+  const calcWeighted = (list: Course[]) => {
+      const credits = list.reduce((sum, c) => sum + c.credits, 0);
+      const points = list.reduce((sum, c) => sum + (c.gpa * c.credits), 0);
+      return {
+          credits,
+          gpa: credits > 0 ? Number((points / credits).toFixed(3)) : 0.000
+      };
+  };
 
-  // Calculate Weighted Score (100 scale)
+  const allStats = calcWeighted(courses);
+  
+  // Calculate Compulsory Stats
+  const compulsoryCourses = courses.filter(c => c.type === '必修');
+  const compulsoryStats = calcWeighted(compulsoryCourses);
+
+  // Calculate Weighted Score (100 scale) for ALL courses
   const totalScorePoints = courses.reduce((sum, course) => sum + (course.score * course.credits), 0);
-  const weightedAverageScore = totalCredits > 0 ? Number((totalScorePoints / totalCredits).toFixed(2)) : 0.00;
+  const weightedAverageScore = allStats.credits > 0 ? Number((totalScorePoints / allStats.credits).toFixed(2)) : 0.00;
 
   // Distribution for charts
   let dist = { '90-100': 0, '80-89': 0, '70-79': 0, '60-69': 0, '<60': 0 };
@@ -76,11 +86,14 @@ export const calculateStats = (courses: Course[]): GpaStats => {
   ];
 
   return {
-    totalCredits,
-    weightedGpa,
+    totalCredits: allStats.credits,
+    weightedGpa: allStats.gpa,
     weightedAverageScore,
     courseCount: courses.length,
     scoreDistribution,
+    
+    compulsoryCredits: compulsoryStats.credits,
+    compulsoryWeightedGpa: compulsoryStats.gpa
   };
 };
 

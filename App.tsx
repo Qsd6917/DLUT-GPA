@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { CalculationMethod, Course } from './types';
+import { CalculationMethod, Course, CourseType } from './types';
 import { calculateCourseGpa, calculateStats } from './services/gpaService';
 import { SAMPLE_COURSES, DEFAULT_CALCULATION_METHOD } from './constants';
 import { AddCourseForm } from './components/AddCourseForm';
 import { CourseList } from './components/CourseList';
 import { EditCourseModal } from './components/EditCourseModal';
 import { DataManagementModal } from './components/DataManagementModal';
+import { ShareableReportModal } from './components/ShareableReportModal';
 import { StatsCard } from './components/StatsCard';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { AiAdvisor } from './components/AiAdvisor';
+import { TargetGpaCalculator } from './components/TargetGpaCalculator';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon } from 'lucide-react';
+import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2 } from 'lucide-react';
 
 const COLORS = ['#10B981', '#005BAC', '#F59E0B', '#EF4444', '#6B7280'];
 const STORAGE_KEY = 'dlut_gpa_courses_v3';
@@ -31,6 +33,7 @@ function App() {
   // Modals State
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -62,8 +65,10 @@ function App() {
             gpa: calculateCourseGpa(c.score, DEFAULT_CALCULATION_METHOD),
         }));
     } else {
+        // Migration: Ensure 'type' exists for old data
         initialCourses = initialCourses.map(c => ({
             ...c,
+            type: c.type || '必修',
             gpa: calculateCourseGpa(c.score, DEFAULT_CALCULATION_METHOD)
         }));
     }
@@ -88,13 +93,14 @@ function App() {
     })));
   }, [method, hydrated]);
 
-  const handleAddCourse = (name: string, credits: number, score: number, semester: string) => {
+  const handleAddCourse = (name: string, credits: number, score: number, semester: string, type: CourseType) => {
     const newCourse: Course = {
       id: Date.now().toString(),
       name,
       credits,
       score,
       semester,
+      type,
       gpa: calculateCourseGpa(score, method),
       isActive: true
     };
@@ -113,7 +119,7 @@ function App() {
     setEditingCourse(course);
   };
   
-  const handleSaveCourse = (id: string, name: string, credits: number, score: number, semester: string) => {
+  const handleSaveCourse = (id: string, name: string, credits: number, score: number, semester: string, type: CourseType) => {
     setCourses(prev => prev.map(c => {
         if (c.id === id) {
             return {
@@ -122,6 +128,7 @@ function App() {
                 credits,
                 score,
                 semester,
+                type,
                 gpa: calculateCourseGpa(score, method)
             };
         }
@@ -145,6 +152,7 @@ function App() {
         id: c.id || Date.now().toString() + Math.random().toString(36).substr(2, 9),
         isActive: c.isActive !== undefined ? c.isActive : true,
         semester: c.semester || '未知学期',
+        type: c.type || '必修',
         gpa: calculateCourseGpa(c.score, method)
     }));
 
@@ -229,6 +237,13 @@ function App() {
         courses={courses}
         onImport={handleImportData}
       />
+      
+      <ShareableReportModal 
+         isOpen={isShareModalOpen}
+         onClose={() => setIsShareModalOpen(false)}
+         stats={stats}
+         courses={activeCourses}
+      />
 
       {/* Header */}
       <header className="glass-header sticky top-0 z-40 transition-all duration-300">
@@ -276,7 +291,22 @@ function App() {
                     <Database size={14} />
                     数据管理
                 </button>
+                <button 
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-xl transition-all duration-200 shadow-md shadow-indigo-200"
+                >
+                    <Share2 size={14} />
+                    分享
+                </button>
             </div>
+            
+            {/* Mobile Share Button (Only Icon) */}
+            <button 
+                onClick={() => setIsShareModalOpen(true)}
+                className="md:hidden flex items-center justify-center text-indigo-600 bg-indigo-50 hover:bg-indigo-100 p-2 rounded-xl transition-all"
+            >
+                <Share2 size={18} />
+            </button>
 
             <div className="flex items-center gap-2 bg-gray-100/80 hover:bg-white border border-transparent hover:border-gray-200 rounded-xl px-3 py-2 transition-all duration-200 shadow-sm">
                 <Settings size={16} className="text-gray-500" />
@@ -301,31 +331,31 @@ function App() {
         {/* Top Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
           <StatsCard
-            title={selectedSemesters.length > 0 ? "所选学期 GPA" : "总加权 GPA"}
+            title="总加权 GPA"
             value={stats.weightedGpa.toFixed(3)}
             icon={<Award className="text-white" size={24} />}
-            description={`基于 ${activeCourses.length} 门课程`}
+            description={`基于 ${stats.totalCredits} 学分`}
             colorClass="bg-gradient-to-br from-[#005BAC] to-[#004280] text-white shadow-lg shadow-blue-900/20"
+          />
+          <StatsCard
+            title="必修课 GPA"
+            value={stats.compulsoryWeightedGpa.toFixed(3)}
+            icon={<Book className="text-purple-600" size={24} />}
+            description={`基于 ${stats.compulsoryCredits} 学分 (保研核心)`}
+            colorClass="bg-white border-l-4 border-purple-500 shadow-soft"
           />
           <StatsCard
             title="加权平均分"
             value={stats.weightedAverageScore.toFixed(2)}
             icon={<Percent className="text-emerald-600" size={24} />}
-            description="百分制加权平均"
+            description="百分制"
             colorClass="bg-white border-l-4 border-emerald-500 shadow-soft"
-          />
-          <StatsCard
-            title="有效学分"
-            value={stats.totalCredits}
-            icon={<Book className="text-dlut-blue" size={24} />}
-            description="计入计算的学分"
-            colorClass="bg-white shadow-soft"
           />
           <StatsCard
             title="课程数量"
             value={activeCourses.length}
             icon={<GraduationCap className="text-dlut-blue" size={24} />}
-            description={`共 ${courses.length} 门 (已选 ${activeCourses.length})`}
+            description={`已选 / 共 ${courses.length} 门`}
             colorClass="bg-white shadow-soft"
           />
         </div>
@@ -469,6 +499,7 @@ function App() {
 
             {/* Other Charts */}
             <AnalysisDashboard courses={activeCourses} />
+            <TargetGpaCalculator currentGpa={stats.weightedGpa} currentCredits={stats.totalCredits} />
             <AiAdvisor courses={activeCourses} stats={stats} />
           </div>
         </div>

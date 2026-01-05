@@ -90,15 +90,16 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
       : courses.filter(c => c.semester === exportSemester);
 
     // Header
-    const headers = ['学期', '课程名称', '学分', '成绩', 'GPA'];
+    const headers = ['学期', '课程名称', '学分', '成绩', 'GPA', '属性'];
     
     // Rows
     const rows = coursesToExport.map(c => [
-        `"\t${c.semester}"`, // Prepend tab and quote to prevent Excel date auto-conversion
-        `"${c.name.replace(/"/g, '""')}"`, // Escape quotes
+        `"\t${c.semester}"`,
+        `"${c.name.replace(/"/g, '""')}"`,
         c.credits,
         c.score,
-        c.gpa
+        c.gpa,
+        c.type || '必修'
     ]);
 
     const csvContent = [
@@ -136,6 +137,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
     const creditIdx = getIndex(['credit', '学分']);
     const scoreIdx = getIndex(['score', '成绩', '分数', 'grade']);
     const semesterIdx = getIndex(['semester', '学期']);
+    const typeIdx = getIndex(['type', '属性', '性质']);
 
     if (nameIdx === -1 || scoreIdx === -1) {
         throw new Error("CSV 必须包含包含“课程名称”和“成绩”的表头");
@@ -154,6 +156,14 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
         const scoreStr = row[scoreIdx];
         const creditStr = creditIdx !== -1 ? row[creditIdx] : '0';
         const semester = semesterIdx !== -1 ? row[semesterIdx] : '未知学期';
+        const typeStr = typeIdx !== -1 ? row[typeIdx] : '必修';
+        
+        // Normalize type
+        let type: any = '必修';
+        if (typeStr.includes('选') && !typeStr.includes('必')) {
+             if (typeStr.includes('任')) type = '任选';
+             else type = '选修';
+        }
 
         if (name && scoreStr) {
             const score = parseFloat(scoreStr);
@@ -166,6 +176,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                     score,
                     credits: isNaN(credits) ? 0 : credits,
                     semester: semester || '未知学期',
+                    type: type,
                     gpa: 0, // Will be calculated
                     isActive: true
                 });
@@ -199,7 +210,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                 const normalized = parsedData.map(c => ({
                     ...c,
                     score: Number(c.score),
-                    credits: Number(c.credits || 0)
+                    credits: Number(c.credits || 0),
+                    type: c.type || '必修'
                 }));
                 setImportData(normalized);
                 setImportError(null);
@@ -364,6 +376,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                       ...existing,
                       score: update.score,
                       credits: update.credits,
+                      type: update.type, // Update Type
                       // We keep the existing ID and active status
                       isActive: existing.isActive
                   };

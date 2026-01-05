@@ -1,3 +1,5 @@
+export type CourseType = '必修' | '选修' | '任选';
+
 export interface Course {
   id: string;
   name: string;
@@ -6,6 +8,7 @@ export interface Course {
   gpa: number;
   isActive: boolean;
   semester: string;
+  type: CourseType;
 }
 
 export enum CalculationMethod {
@@ -23,6 +26,10 @@ export interface GpaStats {
   weightedAverageScore: number;
   courseCount: number;
   scoreDistribution: { name: string; value: number }[];
+  
+  // New fields for compulsory courses
+  compulsoryCredits: number;
+  compulsoryWeightedGpa: number;
 }
 
 export interface SemesterTrend {

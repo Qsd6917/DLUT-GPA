@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Course, GpaStats } from "../types";
+import { Course, GpaStats, CourseType } from "../types";
 
 // Initialize the Gemini API client using the process.env.API_KEY as required by guidelines.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -10,7 +10,7 @@ export const getAcademicAdvice = async (
 ): Promise<{ analysis: string; suggestions: string[]; }> => {
   try {
     const courseSummary = courses
-      .map((c) => `${c.name}: 成绩 ${c.score} (学分: ${c.credits})`)
+      .map((c) => `${c.name} (${c.type}): 成绩 ${c.score} (学分: ${c.credits})`)
       .join("\n");
 
     const prompt = `
@@ -18,14 +18,15 @@ export const getAcademicAdvice = async (
       GPA 计算采用 5.0 分制。
       
       当前统计:
-      加权 GPA: ${stats.weightedGpa}
+      总加权 GPA: ${stats.weightedGpa}
+      必修课 GPA: ${stats.compulsoryWeightedGpa} (此项对保研非常重要)
       总学分: ${stats.totalCredits}
       
       课程列表:
       ${courseSummary}
       
       请提供一个 JSON 格式的回复，包含两个字段 (请使用简体中文回答):
-      1. "analysis": 一段简短的段落，分析学生的表现，指出优势和劣势。
+      1. "analysis": 一段简短的段落，分析学生的表现，指出优势和劣势。请特别关注必修课成绩。
       2. "suggestions": 一个包含 3-5 个具体的建议列表，说明如何提高 GPA 或保持优异成绩。
     `;
 
@@ -63,10 +64,11 @@ export const parseTranscriptFromImage = async (base64Image: string): Promise<Cou
     const prompt = `
       请分析这张成绩单图片，并提取所有课程信息。
       请仔细识别每一行，提取以下字段：
-      - semester (学期，格式如 "1-1", "2023-2024-1" 或 "大一上"，请统一标准化为类似 "1-1", "1-2", "2-1" 的格式，如果图片中没有明确学期，请根据上下文推断或标记为"未知")
+      - semester (学期，格式如 "1-1", "2023-2024-1"，请统一标准化)
       - name (课程名称)
       - credits (学分，数字)
-      - score (成绩/分数)。如果成绩是等级制（如"优"、"良"、"通过"），请按以下规则转换：优=95, 良=85, 中=75, 及格=65, 通过=80 (或者设为0并不计算GPA)。如果是数字，直接提取数字。
+      - score (成绩/分数)。如果成绩是等级制（如"优"、"良"、"通过"），请按以下规则转换：优=95, 良=85, 中=75, 及格=65, 通过=80。如果是数字，直接提取数字。
+      - type (课程属性/性质)。请提取如 "必修", "选修", "任选", "限选" 等字样。如果找不到，默认填 "必修"。
       
       请返回一个 JSON 数组。不要包含 markdown 格式标记。
     `;
@@ -102,6 +104,7 @@ export const parseTranscriptFromImage = async (base64Image: string): Promise<Cou
             credits: Number(item.credits) || 0,
             score: Number(item.score) || 0,
             semester: item.semester || "未知学期",
+            type: normalizeCourseType(item.type),
             gpa: 0,
             isActive: true
         }));
@@ -123,20 +126,20 @@ export const parseTranscriptFromText = async (textData: string): Promise<Course[
       
       请仔细识别，忽略无关的导航栏、页脚等信息，只提取课程列表。
       对于每一门课程，提取以下字段：
-      - semester (学期，格式如 "2023-2024-1", "2023秋", "1-1"。请统一标准化格式，例如 "1-1", "1-2" 或 "2023-2024-1")
+      - semester (学期，格式如 "2023-2024-1", "1-1"。请统一标准化)
       - name (课程名称)
       - credits (学分，数字)
       - score (成绩/分数)。如果成绩是等级制，请按规则转换：优=95, 良=85, 中=75, 及格=65, 通过=80。如果是数字，直接提取。
+      - type (课程属性/性质)。提取如 "必修", "选修", "任选" 等。如果无法确定，默认 "必修"。
 
       待解析的文本/HTML内容如下:
       ${textData.substring(0, 30000)} 
-      // 截取前30000字符以防止超出Token限制，通常足够包含成绩表
       
-      请返回一个 JSON 数组。不要包含 markdown 格式标记。如果无法提取任何课程，返回空数组 []。
+      请返回一个 JSON 数组。不要包含 markdown 格式标记。
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Flash model is great for large context (HTML) handling
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -155,6 +158,7 @@ export const parseTranscriptFromText = async (textData: string): Promise<Course[
             credits: Number(item.credits) || 0,
             score: Number(item.score) || 0,
             semester: item.semester || "未知学期",
+            type: normalizeCourseType(item.type),
             gpa: 0,
             isActive: true
         }));
@@ -166,4 +170,12 @@ export const parseTranscriptFromText = async (textData: string): Promise<Course[
     console.error("Gemini Text Parse Error:", error);
     throw new Error("解析失败，请确保您粘贴了包含成绩表格的文本或 HTML 源码。");
   }
+};
+
+const normalizeCourseType = (raw: string): CourseType => {
+    if (!raw) return '必修';
+    if (raw.includes('必') || raw.includes('限选')) return '必修';
+    if (raw.includes('任选')) return '任选';
+    if (raw.includes('选')) return '选修';
+    return '必修';
 };

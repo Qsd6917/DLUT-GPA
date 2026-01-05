@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { Course } from '../types';
+import { Course, CourseType } from '../types';
 
 interface EditCourseModalProps {
   course: Course;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (id: string, name: string, credits: number, score: number, semester: string) => void;
+  onSave: (id: string, name: string, credits: number, score: number, semester: string, type: CourseType) => void;
   existingSemesters: string[];
 }
 
@@ -15,6 +15,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
   const [credits, setCredits] = useState(course.credits.toString());
   const [score, setScore] = useState(course.score.toString());
   const [semester, setSemester] = useState(course.semester || '');
+  const [type, setType] = useState<CourseType>(course.type || '必修');
 
   // Reset form when course changes
   useEffect(() => {
@@ -23,6 +24,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
       setCredits(course.credits.toString());
       setScore(course.score.toString());
       setSemester(course.semester || '');
+      setType(course.type || '必修');
     }
   }, [course, isOpen]);
 
@@ -36,7 +38,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
         return;
     }
 
-    onSave(course.id, name.trim(), credNum, scoreNum, semester.trim());
+    onSave(course.id, name.trim(), credNum, scoreNum, semester.trim(), type);
   };
 
   if (!isOpen) return null;
@@ -55,18 +57,32 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
         </div>
         
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">学期</label>
-            <input
-                type="text"
-                list="edit-semester-list"
-                value={semester}
-                onChange={(e) => setSemester(e.target.value)}
-                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-            />
-            <datalist id="edit-semester-list">
-                {existingSemesters.map(s => <option key={s} value={s} />)}
-            </datalist>
+          <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">学期</label>
+                <input
+                    type="text"
+                    list="edit-semester-list"
+                    value={semester}
+                    onChange={(e) => setSemester(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                />
+                <datalist id="edit-semester-list">
+                    {existingSemesters.map(s => <option key={s} value={s} />)}
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">属性</label>
+                <select
+                    value={type}
+                    onChange={(e) => setType(e.target.value as CourseType)}
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                >
+                    <option value="必修">必修</option>
+                    <option value="选修">选修</option>
+                    <option value="任选">任选</option>
+                </select>
+              </div>
           </div>
 
           <div>

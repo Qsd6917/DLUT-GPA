@@ -1,7 +1,11 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { X, Download, Upload, FileJson, AlertCircle, CheckCircle2, RefreshCw, FileSpreadsheet, ChevronDown, AlertTriangle, ArrowRight, XCircle, Image as ImageIcon, Loader2, Sparkles, Code, ClipboardCopy } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { X, Download, Upload, FileJson, AlertCircle, CheckCircle2, RefreshCw, FileSpreadsheet, ChevronDown, AlertTriangle, ArrowRight, XCircle, Image as ImageIcon, Loader2, Sparkles, Code, ClipboardCopy, QrCode, Scan } from 'lucide-react';
 import { Course } from '../types';
 import { parseTranscriptFromImage, parseTranscriptFromText } from '../services/geminiService';
+import QRCode from 'qrcode';
+import jsQR from 'jsqr';
+import LZString from 'lz-string';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface DataManagementModalProps {
   isOpen: boolean;
@@ -11,13 +15,21 @@ interface DataManagementModalProps {
 }
 
 export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen, onClose, courses, onImport }) => {
-  const [activeTab, setActiveTab] = useState<'export' | 'import'>('export');
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'export' | 'import' | 'sync'>('export');
   const [dragActive, setDragActive] = useState(false);
   const [importData, setImportData] = useState<Course[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('replace');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pasteContent, setPasteContent] = useState('');
+  
+  // QR Sync State
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
   // Conflict Resolution State
   const [showConflictUI, setShowConflictUI] = useState(false);
@@ -46,6 +58,124 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
     };
   }, [courses, exportSemester]);
 
+  useEffect(() => {
+      // Generate QR Code when switching to Sync tab
+      if (activeTab === 'sync' && courses.length > 0) {
+          generateQRCode();
+      }
+      // Stop scanner when switching away
+      if (activeTab !== 'sync' && isScanning) {
+          stopScanner();
+      }
+  }, [activeTab, courses]);
+
+  // Cleanup scanner on close
+  useEffect(() => {
+      if (!isOpen) {
+          stopScanner();
+      }
+  }, [isOpen]);
+
+  const generateQRCode = async () => {
+      try {
+          // Serialize and Compress
+          const json = JSON.stringify(courses);
+          const compressed = LZString.compressToEncodedURIComponent(json);
+          
+          if (compressed.length > 2500) {
+              setImportError(t('qr_too_large'));
+              setQrCodeDataUrl(null);
+              return;
+          }
+
+          const url = await QRCode.toDataURL(compressed, { 
+              errorCorrectionLevel: 'L',
+              width: 300,
+              margin: 2
+          });
+          setQrCodeDataUrl(url);
+          setImportError(null);
+      } catch (e) {
+          console.error("QR Generation failed", e);
+          setImportError("QR generation failed");
+      }
+  };
+
+  const startScanner = async () => {
+      setIsScanning(true);
+      setImportError(null);
+      try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+          if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              videoRef.current.setAttribute("playsinline", "true");
+              videoRef.current.play();
+              requestAnimationFrame(tick);
+          }
+      } catch (err) {
+          setImportError("无法访问摄像头，请检查权限。");
+          setIsScanning(false);
+      }
+  };
+
+  const stopScanner = () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+          const stream = videoRef.current.srcObject as MediaStream;
+          stream.getTracks().forEach(track => track.stop());
+          videoRef.current.srcObject = null;
+      }
+      if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+      }
+      setIsScanning(false);
+  };
+
+  const tick = () => {
+      if (!videoRef.current || !canvasRef.current) return;
+      
+      if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+          const canvas = canvasRef.current;
+          const video = videoRef.current;
+          
+          canvas.height = video.videoHeight;
+          canvas.width = video.videoWidth;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                  inversionAttempts: "dontInvert",
+              });
+
+              if (code) {
+                  try {
+                      // Attempt to decompress
+                      let jsonStr = LZString.decompressFromEncodedURIComponent(code.data);
+                      if (!jsonStr) jsonStr = code.data; // Maybe it wasn't compressed?
+
+                      const parsed = JSON.parse(jsonStr);
+                      if (Array.isArray(parsed)) {
+                          stopScanner();
+                          // Normalize
+                          const normalized = parsed.map((c: any) => ({
+                             ...c,
+                             score: Number(c.score),
+                             credits: Number(c.credits || 0),
+                             type: c.type || '必修',
+                             isCore: c.isCore || false
+                          }));
+                          setImportData(normalized);
+                          return;
+                      }
+                  } catch (e) {
+                      // Not valid JSON or bad data, keep scanning
+                  }
+              }
+          }
+      }
+      animationFrameRef.current = requestAnimationFrame(tick);
+  };
+
   if (!isOpen) return null;
 
   const resetImportState = () => {
@@ -56,6 +186,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
     setConflictStats({ duplicates: 0, new: 0 });
     setIsAnalyzing(false);
     setPasteContent('');
+    stopScanner();
   };
 
   const handleClose = () => {
@@ -148,7 +279,6 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
     // Parse rows
     for (let i = 1; i < lines.length; i++) {
         // Simple CSV split (handling simple commas, not complex quoted CSVs for now)
-        // We add an extra .trim() at the end to clean up the \t hack used for Excel date prevention
         const row = lines[i].split(',').map(cell => cell.trim().replace(/^"|"$/g, '').trim());
         if (row.length < headers.length) continue;
 
@@ -178,7 +308,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                     semester: semester || '未知学期',
                     type: type,
                     gpa: 0, // Will be calculated
-                    isActive: true
+                    isActive: true,
+                    isCore: false
                 });
             }
         }
@@ -211,7 +342,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                     ...c,
                     score: Number(c.score),
                     credits: Number(c.credits || 0),
-                    type: c.type || '必修'
+                    type: c.type || '必修',
+                    isCore: c.isCore || false
                 }));
                 setImportData(normalized);
                 setImportError(null);
@@ -378,7 +510,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                       credits: update.credits,
                       type: update.type, // Update Type
                       // We keep the existing ID and active status
-                      isActive: existing.isActive
+                      isActive: existing.isActive,
+                      isCore: update.isCore
                   };
               }
               return existing;
@@ -399,7 +532,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
-          <h3 className="text-lg font-bold text-gray-800">数据管理</h3>
+          <h3 className="text-lg font-bold text-gray-800">{t('data_mgmt')}</h3>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-200 transition-colors">
             <X size={20} />
           </button>
@@ -428,12 +561,83 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                     </div>
                     {activeTab === 'import' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
                 </button>
+                 <button 
+                    onClick={() => setActiveTab('sync')}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors relative ${activeTab === 'sync' ? 'text-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                    <div className="flex items-center justify-center gap-2">
+                        <QrCode size={16} />
+                        {t('qr_sync')}
+                    </div>
+                    {activeTab === 'sync' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
+                </button>
             </div>
         )}
 
         {/* Content */}
         <div className="p-6 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
-            {activeTab === 'export' && !showConflictUI ? (
+            {activeTab === 'sync' && !showConflictUI ? (
+                 <div className="space-y-6">
+                    {!isScanning ? (
+                        <>
+                            <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+                                {qrCodeDataUrl ? (
+                                    <>
+                                        <div className="text-sm font-bold text-gray-800 mb-4">{t('qr_send')}</div>
+                                        <img src={qrCodeDataUrl} alt="Sync QR Code" className="w-64 h-64 object-contain rounded-lg border border-gray-100 shadow-sm" />
+                                        <p className="text-xs text-gray-500 mt-4 max-w-xs">{t('qr_desc')}</p>
+                                    </>
+                                ) : (
+                                    <div className="text-gray-400 py-10">
+                                         {t('qr_too_large')}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                    <div className="w-full border-t border-gray-200"></div>
+                                </div>
+                                <div className="relative flex justify-center">
+                                    <span className="bg-white px-2 text-xs text-gray-500 font-medium">OR</span>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={startScanner}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Scan size={20} />
+                                {t('qr_scan')}
+                            </button>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center">
+                            <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden mb-4 border-2 border-indigo-500">
+                                <video ref={videoRef} className="w-full h-full object-cover" />
+                                <canvas ref={canvasRef} className="hidden" />
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-64 h-64 border-2 border-white/50 rounded-xl relative">
+                                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1"></div>
+                                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-indigo-500 -mt-1 -mr-1"></div>
+                                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-indigo-500 -mb-1 -ml-1"></div>
+                                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-indigo-500 -mb-1 -mr-1"></div>
+                                    </div>
+                                </div>
+                                <div className="absolute bottom-4 w-full text-center text-white text-sm font-medium drop-shadow-md">
+                                    {t('qr_scan_instruction')}
+                                </div>
+                            </div>
+                            <button 
+                                onClick={stopScanner}
+                                className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-bold text-sm"
+                            >
+                                {t('cancel')}
+                            </button>
+                        </div>
+                    )}
+                 </div>
+            ) : activeTab === 'export' && !showConflictUI ? (
                 <div className="space-y-6">
                     <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 text-center">
                         <FileJson className="mx-auto text-indigo-500 mb-3" size={48} />

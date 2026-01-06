@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Star } from 'lucide-react';
 import { Course, CourseType } from '../types';
 
 interface EditCourseModalProps {
   course: Course;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (id: string, name: string, credits: number, score: number, semester: string, type: CourseType) => void;
+  onSave: (id: string, name: string, credits: number, score: number, semester: string, type: CourseType, isCore: boolean) => void;
   existingSemesters: string[];
 }
 
@@ -16,6 +16,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
   const [score, setScore] = useState(course.score.toString());
   const [semester, setSemester] = useState(course.semester || '');
   const [type, setType] = useState<CourseType>(course.type || '必修');
+  const [isCore, setIsCore] = useState(course.isCore || false);
 
   // Reset form when course changes
   useEffect(() => {
@@ -25,6 +26,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
       setScore(course.score.toString());
       setSemester(course.semester || '');
       setType(course.type || '必修');
+      setIsCore(course.isCore || false);
     }
   }, [course, isOpen]);
 
@@ -38,7 +40,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
         return;
     }
 
-    onSave(course.id, name.trim(), credNum, scoreNum, semester.trim(), type);
+    onSave(course.id, name.trim(), credNum, scoreNum, semester.trim(), type, isCore);
   };
 
   if (!isOpen) return null;
@@ -118,6 +120,17 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
                 className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
               />
             </div>
+          </div>
+          
+          {/* Core Course Toggle */}
+          <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100 cursor-pointer hover:bg-yellow-100 transition-all" onClick={() => setIsCore(!isCore)}>
+              <div className={`w-5 h-5 rounded flex items-center justify-center border transition-all ${isCore ? 'bg-yellow-500 border-yellow-600' : 'bg-white border-gray-300'}`}>
+                  {isCore && <Star size={12} className="text-white fill-white" />}
+              </div>
+              <div className="select-none">
+                  <span className="text-sm font-bold text-yellow-900">核心专业课</span>
+                  <p className="text-xs text-yellow-700">标记为核心课程，用于保研筛选</p>
+              </div>
           </div>
 
           <div className="flex gap-3 mt-6 pt-2">

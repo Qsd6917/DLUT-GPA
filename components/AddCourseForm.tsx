@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Star } from 'lucide-react';
 import { CourseType } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface AddCourseFormProps {
-  onAdd: (name: string, credits: number, score: number, semester: string, type: CourseType) => void;
+  onAdd: (name: string, credits: number, score: number, semester: string, type: CourseType, isCore: boolean) => void;
   existingNames: string[];
   existingSemesters: string[];
 }
@@ -16,6 +16,7 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
   const [score, setScore] = useState<string>('');
   const [semester, setSemester] = useState('');
   const [type, setType] = useState<CourseType>('必修');
+  const [isCore, setIsCore] = useState(false);
 
   // Auto-fill semester with the most recent one if available
   React.useEffect(() => {
@@ -40,10 +41,11 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
     
     if (isNaN(credNum) || isNaN(scoreNum)) return;
     
-    onAdd(trimmedName, credNum, scoreNum, semester, type);
+    onAdd(trimmedName, credNum, scoreNum, semester, type, isCore);
     setName('');
     setCredits('');
     setScore('');
+    setIsCore(false); // Reset core status
   };
 
   return (
@@ -67,7 +69,7 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
                 {existingSemesters.map(s => <option key={s} value={s} />)}
             </datalist>
         </div>
-        <div className="md:col-span-4">
+        <div className="md:col-span-3">
           <label className="block text-sm font-medium text-indigo-100 mb-1">{t('course_name')}</label>
           <input
             type="text"
@@ -88,6 +90,17 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
              <option value="选修">{t('type_elective')}</option>
              <option value="任选">{t('type_optional')}</option>
            </select>
+        </div>
+        <div className="md:col-span-1">
+          <label className="block text-sm font-medium text-indigo-100 mb-1">{t('is_core')}</label>
+          <button 
+            type="button" 
+            onClick={() => setIsCore(!isCore)}
+            className={`w-full h-[38px] rounded-xl flex items-center justify-center transition-all ${isCore ? 'bg-yellow-400 text-yellow-900 shadow-inner' : 'bg-indigo-700 text-indigo-300 hover:bg-indigo-500'}`}
+            title="Mark as Core Course"
+          >
+              <Star size={18} className={isCore ? 'fill-yellow-900' : ''} />
+          </button>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-indigo-100 mb-1">{t('credits')}</label>

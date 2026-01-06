@@ -10,6 +10,7 @@ export interface Course {
   isActive: boolean;
   semester: string;
   type: CourseType;
+  isCore?: boolean; // New: Is this a core major course?
 }
 
 export enum CalculationMethod {

@@ -12,8 +12,9 @@ import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { AiAdvisor } from './components/AiAdvisor';
 import { TargetGpaCalculator } from './components/TargetGpaCalculator';
 import { GraduationProgress } from './components/GraduationProgress';
+import { ApplicationCalculator } from './components/ApplicationCalculator';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2, Languages, FlaskConical, XCircle, Save } from 'lucide-react';
+import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2, Languages, FlaskConical, XCircle, Save, Calculator } from 'lucide-react';
 import { useTranslation } from './contexts/LanguageContext';
 
 const COLORS = ['#10B981', '#005BAC', '#F59E0B', '#EF4444', '#6B7280'];
@@ -34,13 +35,13 @@ function App() {
   
   // UI State
   const [logoError, setLogoError] = useState(false);
-
   const [hydrated, setHydrated] = useState(false);
   
   // Modals State
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isAppCalcOpen, setIsAppCalcOpen] = useState(false);
   
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -72,10 +73,11 @@ function App() {
             gpa: calculateCourseGpa(c.score, DEFAULT_CALCULATION_METHOD),
         }));
     } else {
-        // Migration: Ensure 'type' exists for old data
+        // Migration: Ensure 'type' and 'isCore' exists for old data
         initialCourses = initialCourses.map(c => ({
             ...c,
             type: c.type || '必修',
+            isCore: c.isCore !== undefined ? c.isCore : false,
             gpa: calculateCourseGpa(c.score, DEFAULT_CALCULATION_METHOD)
         }));
     }
@@ -100,7 +102,7 @@ function App() {
     })));
   }, [method, hydrated]);
 
-  const handleAddCourse = (name: string, credits: number, score: number, semester: string, type: CourseType) => {
+  const handleAddCourse = (name: string, credits: number, score: number, semester: string, type: CourseType, isCore: boolean) => {
     const newCourse: Course = {
       id: Date.now().toString(),
       name,
@@ -108,6 +110,7 @@ function App() {
       score,
       semester,
       type,
+      isCore,
       gpa: calculateCourseGpa(score, method),
       isActive: true
     };
@@ -126,7 +129,7 @@ function App() {
     setEditingCourse(course);
   };
   
-  const handleSaveCourse = (id: string, name: string, credits: number, score: number, semester: string, type: CourseType) => {
+  const handleSaveCourse = (id: string, name: string, credits: number, score: number, semester: string, type: CourseType, isCore: boolean) => {
     setCourses(prev => prev.map(c => {
         if (c.id === id) {
             return {
@@ -136,12 +139,17 @@ function App() {
                 score,
                 semester,
                 type,
+                isCore,
                 gpa: calculateCourseGpa(score, method)
             };
         }
         return c;
     }));
     setEditingCourse(null);
+  };
+  
+  const handleUpdateCourseFromAppCalc = (updated: Course) => {
+      setCourses(prev => prev.map(c => c.id === updated.id ? updated : c));
   };
 
   const handleToggleAll = (checked: boolean) => {
@@ -160,6 +168,7 @@ function App() {
         isActive: c.isActive !== undefined ? c.isActive : true,
         semester: c.semester || '未知学期',
         type: c.type || '必修',
+        isCore: c.isCore || false,
         gpa: calculateCourseGpa(c.score, method)
     }));
 
@@ -290,6 +299,13 @@ function App() {
          onClose={() => setIsShareModalOpen(false)}
          stats={stats}
          courses={activeCourses}
+      />
+      
+      <ApplicationCalculator
+          isOpen={isAppCalcOpen}
+          onClose={() => setIsAppCalcOpen(false)}
+          courses={courses}
+          onUpdateCourse={handleUpdateCourseFromAppCalc}
       />
 
       {/* Header */}
@@ -581,6 +597,22 @@ function App() {
             </div>
 
             {/* Other Charts */}
+            <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg text-white relative overflow-hidden group">
+                <div className="relative z-10 flex items-center justify-between">
+                     <div>
+                         <h3 className="font-bold text-lg mb-1">{t('app_calc_title')}</h3>
+                         <p className="text-xs text-blue-100 opacity-80">WES 算法 · 排除体育/任选</p>
+                     </div>
+                     <button 
+                        onClick={() => setIsAppCalcOpen(true)}
+                        className="p-2 bg-white text-indigo-600 rounded-xl hover:bg-blue-50 transition-colors shadow-md"
+                     >
+                         <Calculator size={20} />
+                     </button>
+                </div>
+                <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-white opacity-10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
+            </div>
+
             <AnalysisDashboard courses={activeCourses} />
             <TargetGpaCalculator currentGpa={stats.weightedGpa} currentCredits={stats.totalCredits} />
             <GraduationProgress courses={activeCourses} totalCredits={stats.totalCredits} />

@@ -11,19 +11,26 @@ import { StatsCard } from './components/StatsCard';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { AiAdvisor } from './components/AiAdvisor';
 import { TargetGpaCalculator } from './components/TargetGpaCalculator';
+import { GraduationProgress } from './components/GraduationProgress';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2 } from 'lucide-react';
+import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2, Languages, FlaskConical, XCircle, Save } from 'lucide-react';
+import { useTranslation } from './contexts/LanguageContext';
 
 const COLORS = ['#10B981', '#005BAC', '#F59E0B', '#EF4444', '#6B7280'];
 const STORAGE_KEY = 'dlut_gpa_courses_v3';
 
 function App() {
+  const { t, language, setLanguage } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [method, setMethod] = useState<CalculationMethod>(DEFAULT_CALCULATION_METHOD);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSemesters, setSelectedSemesters] = useState<string[]>([]);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  
+  // Sandbox State
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [originalCourses, setOriginalCourses] = useState<Course[]>([]);
   
   // UI State
   const [logoError, setLogoError] = useState(false);
@@ -77,12 +84,12 @@ function App() {
     setHydrated(true);
   }, []);
 
-  // Persist courses
+  // Persist courses - IMPORTANT: Do not save during Sandbox Mode
   useEffect(() => {
-    if (hydrated && courses.length > 0) {
+    if (hydrated && courses.length > 0 && !isSandboxMode) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
     }
-  }, [courses, hydrated]);
+  }, [courses, hydrated, isSandboxMode]);
 
   // Recalculate individual GPAs when method changes
   useEffect(() => {
@@ -168,7 +175,7 @@ function App() {
   };
 
   const handleResetToDefault = () => {
-    if (window.confirm('确定要重置所有数据到初始状态吗？此操作不可恢复。')) {
+    if (window.confirm(t('confirm_reset'))) {
         localStorage.removeItem(STORAGE_KEY);
         const defaultCourses = SAMPLE_COURSES.map(c => ({
             ...c,
@@ -178,6 +185,25 @@ function App() {
         setSelectedSemesters([]);
         setSearchTerm('');
     }
+  };
+
+  // Sandbox Logic
+  const handleEnterSandbox = () => {
+    setOriginalCourses(JSON.parse(JSON.stringify(courses)));
+    setIsSandboxMode(true);
+  };
+
+  const handleExitSandbox = (save: boolean) => {
+    if (save) {
+       // Just exit sandbox, the current `courses` state is what we want to keep
+       setIsSandboxMode(false);
+       // The `useEffect` will trigger and save to localStorage
+    } else {
+       // Revert
+       setCourses(originalCourses);
+       setIsSandboxMode(false);
+    }
+    setOriginalCourses([]);
   };
 
   const semesters = useMemo(() => {
@@ -209,9 +235,30 @@ function App() {
 
   const activeCourses = useMemo(() => filteredCourses.filter(c => c.isActive), [filteredCourses]);
   const stats = useMemo(() => calculateStats(activeCourses), [activeCourses]);
+  
+  const originalStats = useMemo(() => {
+      if (!isSandboxMode) return null;
+      // We need to respect the current filter even for original stats to make comparison meaningful
+      // So we filter originalCourses by the same criteria
+      let filteredOriginal = originalCourses;
+      
+      if (selectedSemesters.length > 0) {
+        filteredOriginal = filteredOriginal.filter(c => selectedSemesters.includes(c.semester));
+      }
+      if (searchTerm.trim()) {
+        filteredOriginal = filteredOriginal.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      }
+      
+      const activeOriginal = filteredOriginal.filter(c => c.isActive);
+      return calculateStats(activeOriginal);
+  }, [isSandboxMode, originalCourses, selectedSemesters, searchTerm]);
+
+  const toggleLanguage = () => {
+      setLanguage(language === 'zh' ? 'en' : 'zh');
+  };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-gray-800 pb-12 font-sans selection:bg-blue-100 selection:text-dlut-blue">
+    <div className={`min-h-screen pb-12 font-sans selection:bg-blue-100 selection:text-dlut-blue transition-colors duration-300 ${isSandboxMode ? 'bg-amber-50/50' : 'bg-[#F8FAFC] text-gray-800'}`}>
       <style>{`
         .text-dlut-blue { color: #005BAC; }
         .bg-dlut-blue { background-color: #005BAC; }
@@ -246,7 +293,7 @@ function App() {
       />
 
       {/* Header */}
-      <header className="glass-header sticky top-0 z-40 transition-all duration-300">
+      <header className={`glass-header sticky top-0 z-40 transition-all duration-300 ${isSandboxMode ? 'border-b-amber-200 bg-amber-50/90' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4 group cursor-default">
             <div className="flex-shrink-0 relative overflow-hidden rounded-full p-1 bg-white border border-blue-50 shadow-sm transition-transform group-hover:scale-105 duration-300 w-12 h-12 flex items-center justify-center">
@@ -265,61 +312,89 @@ function App() {
             </div>
             <div>
                 <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
-                  DLUT GPA
-                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-dlut-blue text-[10px] font-bold uppercase tracking-wider border border-blue-100 hidden sm:inline-block">
-                    Pro
+                  {t('app_title')}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border hidden sm:inline-block ${isSandboxMode ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-blue-50 text-dlut-blue border-blue-100'}`}>
+                    {isSandboxMode ? t('sandbox_mode') : 'Pro'}
                   </span>
                 </h1>
-                <p className="text-xs text-gray-500 font-medium tracking-wide">大连理工大学成绩管理系统</p>
+                <p className="text-xs text-gray-500 font-medium tracking-wide">{t('app_desc')}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="hidden md:flex items-center gap-2">
-                 <button 
-                    onClick={handleResetToDefault}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all duration-200"
-                >
-                    <RotateCcw size={14} />
-                    初始化
-                </button>
-                <div className="w-px h-4 bg-gray-200"></div>
-                <button 
-                    onClick={() => setIsDataModalOpen(true)}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-dlut-blue px-3 py-2 rounded-xl hover:bg-blue-50 transition-all duration-200"
-                >
-                    <Database size={14} />
-                    数据管理
-                </button>
-                <button 
-                    onClick={() => setIsShareModalOpen(true)}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-xl transition-all duration-200 shadow-md shadow-indigo-200"
-                >
-                    <Share2 size={14} />
-                    分享
-                </button>
+                 {!isSandboxMode ? (
+                     <>
+                        <button 
+                            onClick={handleResetToDefault}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all duration-200"
+                        >
+                            <RotateCcw size={14} />
+                            {t('reset')}
+                        </button>
+                        <div className="w-px h-4 bg-gray-200"></div>
+                        <button 
+                            onClick={() => setIsDataModalOpen(true)}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-dlut-blue px-3 py-2 rounded-xl hover:bg-blue-50 transition-all duration-200"
+                        >
+                            <Database size={14} />
+                            {t('data_mgmt')}
+                        </button>
+                        <button 
+                            onClick={() => setIsShareModalOpen(true)}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-xl transition-all duration-200 shadow-md shadow-indigo-200"
+                        >
+                            <Share2 size={14} />
+                            {t('share')}
+                        </button>
+                        <button 
+                            onClick={handleEnterSandbox}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-2 rounded-xl transition-all duration-200 border border-amber-200 ml-2"
+                        >
+                            <FlaskConical size={14} />
+                            {t('enter_sandbox')}
+                        </button>
+                     </>
+                 ) : (
+                     <div className="flex items-center gap-2 bg-amber-100 px-2 py-1 rounded-xl border border-amber-200">
+                         <FlaskConical size={14} className="text-amber-600 animate-pulse" />
+                         <span className="text-xs font-bold text-amber-800">{t('sandbox_active')}</span>
+                     </div>
+                 )}
             </div>
             
             {/* Mobile Share Button (Only Icon) */}
+            {!isSandboxMode && (
+                <button 
+                    onClick={() => setIsShareModalOpen(true)}
+                    className="md:hidden flex items-center justify-center text-indigo-600 bg-indigo-50 hover:bg-indigo-100 p-2 rounded-xl transition-all"
+                >
+                    <Share2 size={18} />
+                </button>
+            )}
+
+            {/* Language Switcher */}
             <button 
-                onClick={() => setIsShareModalOpen(true)}
-                className="md:hidden flex items-center justify-center text-indigo-600 bg-indigo-50 hover:bg-indigo-100 p-2 rounded-xl transition-all"
+                onClick={toggleLanguage}
+                className="flex items-center justify-center p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                title="Switch Language"
             >
-                <Share2 size={18} />
+                <Languages size={18} />
+                <span className="text-xs font-bold ml-1 uppercase">{language}</span>
             </button>
 
-            <div className="flex items-center gap-2 bg-gray-100/80 hover:bg-white border border-transparent hover:border-gray-200 rounded-xl px-3 py-2 transition-all duration-200 shadow-sm">
+            <div className="flex items-center gap-2 bg-gray-100/80 hover:bg-white border border-transparent hover:border-gray-200 rounded-xl px-2 py-2 transition-all duration-200 shadow-sm">
                 <Settings size={16} className="text-gray-500" />
                 <select
                     value={method}
                     onChange={(e) => setMethod(e.target.value as CalculationMethod)}
-                    className="text-sm border-none bg-transparent font-semibold text-gray-700 focus:ring-0 cursor-pointer focus:outline-none min-w-[100px] sm:min-w-[120px]"
+                    className="text-sm border-none bg-transparent font-semibold text-gray-700 focus:ring-0 cursor-pointer focus:outline-none w-[90px] sm:w-auto"
                 >
-                    <option value={CalculationMethod.SUBTRACTIVE}>DLUT 5.0 (标准)</option>
-                    <option value={CalculationMethod.STD_4_0}>Standard 4.0</option>
-                    <option value={CalculationMethod.PKU_4_0}>北大 4.0</option>
-                    <option value={CalculationMethod.SCALE_4_5}>4.5 分制</option>
-                    <option value={CalculationMethod.LINEAR}>线性 5.0 (/20)</option>
+                    <option value={CalculationMethod.SUBTRACTIVE}>DLUT 5.0</option>
+                    <option value={CalculationMethod.STD_4_0}>Std 4.0</option>
+                    <option value={CalculationMethod.PKU_4_0}>PKU 4.0</option>
+                    <option value={CalculationMethod.SCALE_4_5}>4.5 Scale</option>
+                    <option value={CalculationMethod.LINEAR}>Linear 5.0</option>
                     <option value={CalculationMethod.WES}>WES 5.0</option>
                 </select>
             </div>
@@ -331,32 +406,40 @@ function App() {
         {/* Top Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
           <StatsCard
-            title="总加权 GPA"
+            title={t('total_gpa')}
             value={stats.weightedGpa.toFixed(3)}
             icon={<Award className="text-white" size={24} />}
-            description={`基于 ${stats.totalCredits} 学分`}
+            description={t('based_on_credits', stats.totalCredits)}
             colorClass="bg-gradient-to-br from-[#005BAC] to-[#004280] text-white shadow-lg shadow-blue-900/20"
+            comparisonValue={originalStats?.weightedGpa.toFixed(3)}
+            isSandbox={isSandboxMode}
           />
           <StatsCard
-            title="必修课 GPA"
+            title={t('compulsory_gpa')}
             value={stats.compulsoryWeightedGpa.toFixed(3)}
             icon={<Book className="text-purple-600" size={24} />}
-            description={`基于 ${stats.compulsoryCredits} 学分 (保研核心)`}
+            description={t('compulsory_desc', stats.compulsoryCredits)}
             colorClass="bg-white border-l-4 border-purple-500 shadow-soft"
+            comparisonValue={originalStats?.compulsoryWeightedGpa.toFixed(3)}
+            isSandbox={isSandboxMode}
           />
           <StatsCard
-            title="加权平均分"
+            title={t('avg_score')}
             value={stats.weightedAverageScore.toFixed(2)}
             icon={<Percent className="text-emerald-600" size={24} />}
-            description="百分制"
+            description={t('hundred_scale')}
             colorClass="bg-white border-l-4 border-emerald-500 shadow-soft"
+            comparisonValue={originalStats?.weightedAverageScore.toFixed(2)}
+            isSandbox={isSandboxMode}
           />
           <StatsCard
-            title="课程数量"
+            title={t('course_count')}
             value={activeCourses.length}
             icon={<GraduationCap className="text-dlut-blue" size={24} />}
-            description={`已选 / 共 ${courses.length} 门`}
+            description={t('selected_total', courses.length)}
             colorClass="bg-white shadow-soft"
+            comparisonValue={originalStats?.courseCount}
+            isSandbox={isSandboxMode}
           />
         </div>
 
@@ -369,30 +452,30 @@ function App() {
                 existingSemesters={semesters}
             />
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-soft border border-gray-100/50 relative z-20 transition-all hover:shadow-md">
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl shadow-soft border relative z-20 transition-all hover:shadow-md ${isSandboxMode ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100/50'}`}>
                 {/* Multi-select Filter */}
                 <div className="relative" ref={filterRef}>
                     <button 
                         onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 hover:bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:text-dlut-blue transition-all duration-200 text-sm font-semibold text-gray-700 shadow-sm"
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-semibold shadow-sm ${isSandboxMode ? 'bg-white border-amber-200 text-amber-900 hover:bg-amber-100' : 'bg-gray-50 hover:bg-white border-gray-200 hover:border-blue-300 hover:text-dlut-blue text-gray-700'}`}
                     >
                         <Filter size={15} />
                         <span>
                             {selectedSemesters.length === 0 
-                                ? "全部学期" 
-                                : `已选 ${selectedSemesters.length} 个学期`}
+                                ? t('all_semesters')
+                                : t('selected_semesters', selectedSemesters.length)}
                         </span>
                         <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {isFilterDropdownOpen && (
                         <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/5">
-                             <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">筛选学期</div>
+                             <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">{t('filter_semester')}</div>
                              <div 
                                 onClick={() => setSelectedSemesters([])}
                                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm mb-1 transition-colors ${selectedSemesters.length === 0 ? 'bg-blue-50 text-dlut-blue font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
                              >
-                                <span>全部显示</span>
+                                <span>{t('all_semesters')}</span>
                                 {selectedSemesters.length === 0 && <Check size={16} />}
                              </div>
                              <div className="h-px bg-gray-100 my-1"></div>
@@ -417,7 +500,7 @@ function App() {
                         <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-dlut-blue transition-colors" size={16} />
                         <input 
                             type="text" 
-                            placeholder="搜索课程名称..." 
+                            placeholder={t('search_placeholder')}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-dlut-blue w-full transition-all bg-gray-50 focus:bg-white"
@@ -443,7 +526,7 @@ function App() {
               <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <Sparkles size={18} className="text-yellow-500" />
-                    成绩等级分布
+                    {t('score_dist')}
                   </h3>
               </div>
               
@@ -482,7 +565,7 @@ function App() {
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm gap-2">
                         <PieChartIcon size={32} className="opacity-20" />
-                        请勾选课程以查看分布
+                        {t('no_data')}
                     </div>
                 )}
               </div>
@@ -500,10 +583,44 @@ function App() {
             {/* Other Charts */}
             <AnalysisDashboard courses={activeCourses} />
             <TargetGpaCalculator currentGpa={stats.weightedGpa} currentCredits={stats.totalCredits} />
+            <GraduationProgress courses={activeCourses} totalCredits={stats.totalCredits} />
             <AiAdvisor courses={activeCourses} stats={stats} />
           </div>
         </div>
       </main>
+
+      {/* Sandbox Floating Banner */}
+      {isSandboxMode && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 z-50 animate-in slide-in-from-bottom-20">
+              <div className="max-w-4xl mx-auto bg-amber-900/90 text-white backdrop-blur-md rounded-2xl shadow-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border border-amber-700/50">
+                  <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-500 rounded-xl text-white shadow-sm animate-pulse">
+                          <FlaskConical size={20} />
+                      </div>
+                      <div>
+                          <h4 className="font-bold text-sm">{t('sandbox_active')}</h4>
+                          <p className="text-xs text-amber-200">{t('sandbox_banner')}</p>
+                      </div>
+                  </div>
+                  <div className="flex gap-3 w-full sm:w-auto">
+                      <button 
+                          onClick={() => handleExitSandbox(false)}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                          <XCircle size={16} />
+                          {t('exit_sandbox_discard')}
+                      </button>
+                      <button 
+                          onClick={() => handleExitSandbox(true)}
+                          className="flex-1 sm:flex-none px-6 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded-xl text-sm font-bold shadow-lg shadow-amber-900/50 transition-colors flex items-center justify-center gap-2"
+                      >
+                          <Save size={16} />
+                          {t('exit_sandbox_save')}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 }

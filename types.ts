@@ -1,3 +1,4 @@
+
 export type CourseType = '必修' | '选修' | '任选';
 
 export interface Course {
@@ -42,4 +43,11 @@ export interface AiAdviceResponse {
   analysis: string;
   suggestions: string[];
   projectedGpa?: number;
+}
+
+export interface GraduationRequirements {
+  total: number;
+  compulsory: number;
+  elective: number; // 选修
+  optional: number; // 任选
 }

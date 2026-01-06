@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 import { CourseType } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface AddCourseFormProps {
   onAdd: (name: string, credits: number, score: number, semester: string, type: CourseType) => void;
@@ -9,6 +10,7 @@ interface AddCourseFormProps {
 }
 
 export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNames, existingSemesters }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [credits, setCredits] = useState<string>('');
   const [score, setScore] = useState<string>('');
@@ -28,7 +30,7 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
     
     const trimmedName = name.trim();
     if (existingNames.includes(trimmedName)) {
-      if(!window.confirm(`课程 "${trimmedName}" 似乎已存在。确定要重复添加吗？`)) {
+      if(!window.confirm(`Course "${trimmedName}" seems to exist. Add duplicate?`)) {
           return;
       }
     }
@@ -48,11 +50,11 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
     <form onSubmit={handleSubmit} className="bg-indigo-600 p-6 rounded-2xl shadow-md border border-indigo-500 mb-6">
       <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
         <PlusCircle size={20} className="text-indigo-200" />
-        添加新课程
+        {t('add_course')}
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
         <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-indigo-100 mb-1">学期</label>
+            <label className="block text-sm font-medium text-indigo-100 mb-1">{t('semester')}</label>
             <input 
                 type="text"
                 list="semester-list"
@@ -66,29 +68,29 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
             </datalist>
         </div>
         <div className="md:col-span-4">
-          <label className="block text-sm font-medium text-indigo-100 mb-1">课程名称</label>
+          <label className="block text-sm font-medium text-indigo-100 mb-1">{t('course_name')}</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="例如：高等微积分"
+            placeholder="e.g. Calculus"
             className="w-full px-3 py-2 rounded-xl border border-transparent bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-indigo-300 outline-none transition-all shadow-sm text-sm"
           />
         </div>
         <div className="md:col-span-2">
-           <label className="block text-sm font-medium text-indigo-100 mb-1">属性</label>
+           <label className="block text-sm font-medium text-indigo-100 mb-1">{t('type')}</label>
            <select
              value={type}
              onChange={(e) => setType(e.target.value as CourseType)}
              className="w-full px-3 py-2 rounded-xl border border-transparent bg-white text-gray-900 focus:ring-2 focus:ring-indigo-300 outline-none transition-all shadow-sm text-sm cursor-pointer"
            >
-             <option value="必修">必修</option>
-             <option value="选修">选修</option>
-             <option value="任选">任选</option>
+             <option value="必修">{t('type_compulsory')}</option>
+             <option value="选修">{t('type_elective')}</option>
+             <option value="任选">{t('type_optional')}</option>
            </select>
         </div>
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-indigo-100 mb-1">学分</label>
+          <label className="block text-sm font-medium text-indigo-100 mb-1">{t('credits')}</label>
           <input
             type="number"
             value={credits}
@@ -100,7 +102,7 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
           />
         </div>
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-indigo-100 mb-1">分数</label>
+          <label className="block text-sm font-medium text-indigo-100 mb-1">{t('score')}</label>
           <div className="flex gap-2">
               <input
                 type="number"
@@ -114,7 +116,7 @@ export const AddCourseForm: React.FC<AddCourseFormProps> = ({ onAdd, existingNam
               <button
                 type="submit"
                 className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold p-2 rounded-xl transition-colors shadow-lg flex items-center justify-center aspect-square"
-                title="添加"
+                title="Add"
               >
                 <PlusCircle size={20} />
               </button>

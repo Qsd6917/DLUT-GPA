@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Trash2, BookOpen, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Calculator, Ban } from 'lucide-react';
 import { Course } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface CourseListProps {
   courses: Course[];
@@ -44,6 +45,7 @@ const ToggleSwitch = ({ checked, onChange }: { checked: boolean; onChange: () =>
 );
 
 export const CourseList: React.FC<CourseListProps> = ({ courses, onRemove, onEdit, onToggle, onToggleAll }) => {
+  const { t } = useTranslation();
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   const allChecked = courses.length > 0 && courses.every(c => c.isActive);
@@ -99,14 +101,23 @@ export const CourseList: React.FC<CourseListProps> = ({ courses, onRemove, onEdi
       }
   };
 
+  const getTranslatedType = (type: string) => {
+      switch(type) {
+          case '必修': return t('type_compulsory');
+          case '选修': return t('type_elective');
+          case '任选': return t('type_optional');
+          default: return type;
+      }
+  };
+
   if (courses.length === 0) {
     return (
       <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-soft">
         <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
              <BookOpen className="h-8 w-8 text-gray-300" />
         </div>
-        <h3 className="text-gray-900 font-medium mb-1">暂无课程数据</h3>
-        <p className="text-sm text-gray-500">请使用上方表单添加课程或导入备份。</p>
+        <h3 className="text-gray-900 font-medium mb-1">{t('no_data')}</h3>
+        <p className="text-sm text-gray-500">{t('no_data_desc')}</p>
       </div>
     );
   }
@@ -130,18 +141,18 @@ export const CourseList: React.FC<CourseListProps> = ({ courses, onRemove, onEdi
                     />
                      {/* Tooltip for Select All */}
                      <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-max px-2 py-1 bg-gray-800 text-white text-[10px] font-medium rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10 shadow-sm">
-                        全选 / 反选
+                        All / None
                         <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></span>
                     </span>
                 </div>
               </th>
               {/* Added w-24 to ensure semantic column doesn't wrap */}
-              <HeaderCell label="学期" sortKey="semester" width="w-24" />
-              <HeaderCell label="课程名称" sortKey="name" />
-              <HeaderCell label="学分" sortKey="credits" />
-              <HeaderCell label="分数" sortKey="score" />
-              <HeaderCell label="GPA" sortKey="gpa" />
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">操作</th>
+              <HeaderCell label={t('semester')} sortKey="semester" width="w-24" />
+              <HeaderCell label={t('course_name')} sortKey="name" />
+              <HeaderCell label={t('credits')} sortKey="credits" />
+              <HeaderCell label={t('score')} sortKey="score" />
+              <HeaderCell label={t('gpa')} sortKey="gpa" />
+              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">{t('action')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -174,7 +185,7 @@ export const CourseList: React.FC<CourseListProps> = ({ courses, onRemove, onEdi
                              {course.name}
                          </span>
                          <span className={`text-[10px] w-fit px-1.5 py-0.5 rounded border mt-1 ${getTypeColor(course.type)}`}>
-                             {course.type || '必修'}
+                             {getTranslatedType(course.type || '必修')}
                          </span>
                      </div>
                 </td>
@@ -205,7 +216,7 @@ export const CourseList: React.FC<CourseListProps> = ({ courses, onRemove, onEdi
                     ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
                              <Ban size={10} /> 
-                             排除
+                             Excl
                         </span>
                     )}
                 </td>
@@ -214,14 +225,14 @@ export const CourseList: React.FC<CourseListProps> = ({ courses, onRemove, onEdi
                     <button
                         onClick={() => onEdit(course)}
                         className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded-lg hover:bg-indigo-50"
-                        title="编辑课程"
+                        title={t('edit_course')}
                     >
                         <Pencil size={15} />
                     </button>
                     <button
                         onClick={() => onRemove(course.id)}
                         className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50"
-                        title="删除课程"
+                        title="Delete"
                     >
                         <Trash2 size={15} />
                     </button>

@@ -6,14 +6,15 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getAcademicAdvice = async (
   courses: Course[],
-  stats: GpaStats
+  stats: GpaStats,
+  language: 'zh' | 'en' = 'zh'
 ): Promise<{ analysis: string; suggestions: string[]; }> => {
   try {
     const courseSummary = courses
-      .map((c) => `${c.name} (${c.type}): 成绩 ${c.score} (学分: ${c.credits})`)
+      .map((c) => `${c.name} (${c.type}): ${c.score} (Credits: ${c.credits})`)
       .join("\n");
 
-    const prompt = `
+    const promptZh = `
       你是一位专业的学业导师。请根据以下学生的成绩单和GPA数据进行分析。
       GPA 计算采用 5.0 分制。
       
@@ -30,9 +31,26 @@ export const getAcademicAdvice = async (
       2. "suggestions": 一个包含 3-5 个具体的建议列表，说明如何提高 GPA 或保持优异成绩。
     `;
 
+    const promptEn = `
+      You are a professional academic advisor. Please analyze the student's transcript and GPA data below.
+      GPA is calculated on a 5.0 scale.
+      
+      Current Stats:
+      Total Weighted GPA: ${stats.weightedGpa}
+      Compulsory GPA: ${stats.compulsoryWeightedGpa} (Important for graduate admission)
+      Total Credits: ${stats.totalCredits}
+      
+      Course List:
+      ${courseSummary}
+      
+      Please provide a JSON response with two fields (Respond in English):
+      1. "analysis": A short paragraph analyzing the student's performance, pointing out strengths and weaknesses. Pay special attention to compulsory courses.
+      2. "suggestions": A list of 3-5 specific suggestions on how to improve GPA or maintain excellence.
+    `;
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt,
+      contents: language === 'zh' ? promptZh : promptEn,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -50,12 +68,12 @@ export const getAcademicAdvice = async (
 
     const result = JSON.parse(response.text || "{}");
     return {
-      analysis: result.analysis || "无法生成分析。",
-      suggestions: result.suggestions || ["继续加油！"],
+      analysis: result.analysis || (language === 'zh' ? "无法生成分析。" : "Cannot generate analysis."),
+      suggestions: result.suggestions || (language === 'zh' ? ["继续加油！"] : ["Keep it up!"]),
     };
   } catch (error) {
     console.error("Gemini API Error:", error);
-    throw new Error("获取学业建议失败。");
+    throw new Error(language === 'zh' ? "获取学业建议失败。" : "Failed to get academic advice.");
   }
 };
 

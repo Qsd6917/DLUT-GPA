@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { Course, GpaStats } from '../types';
 import { getAcademicAdvice } from '../services/geminiService';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface AiAdvisorProps {
   courses: Course[];
@@ -9,23 +10,24 @@ interface AiAdvisorProps {
 }
 
 export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
+  const { t, language } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [advice, setAdvice] = useState<{ analysis: string; suggestions: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   const handleGenerateAdvice = async () => {
     if (courses.length === 0) {
-      setError("请先添加一些课程。");
+      setError(language === 'zh' ? "请先添加一些课程。" : "Please add some courses first.");
       return;
     }
     
     setLoading(true);
     setError(null);
     try {
-      const result = await getAcademicAdvice(courses, stats);
+      const result = await getAcademicAdvice(courses, stats, language);
       setAdvice(result);
     } catch (err) {
-      setError("当前无法生成建议。请稍后再试。");
+      setError(language === 'zh' ? "当前无法生成建议。请稍后再试。" : "Cannot generate advice right now. Try again later.");
     } finally {
       setLoading(false);
     }
@@ -44,8 +46,8 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
               <Sparkles className="text-yellow-300" size={24} />
             </div>
             <div>
-              <h3 className="text-xl font-bold">Gemini 智能学业导师</h3>
-              <p className="text-indigo-100 text-sm">基于您的成绩提供个性化分析</p>
+              <h3 className="text-xl font-bold">{t('ai_advisor')}</h3>
+              <p className="text-indigo-100 text-sm">{t('ai_desc')}</p>
             </div>
           </div>
         </div>
@@ -53,13 +55,15 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
         {!advice && !loading && (
           <div className="text-center py-8">
             <p className="text-indigo-100 mb-6">
-              获取 AI 驱动的 GPA 趋势分析、优势评估以及可行的改进建议。
+               {language === 'zh' 
+                 ? '获取 AI 驱动的 GPA 趋势分析、优势评估以及可行的改进建议。' 
+                 : 'Get AI-driven insights on your GPA trends, strengths, and actionable advice.'}
             </p>
             <button
               onClick={handleGenerateAdvice}
               className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-3 px-8 rounded-full shadow-lg transition-all transform hover:scale-105"
             >
-              分析我的成绩单
+              {t('ai_btn')}
             </button>
             {error && <p className="text-red-300 mt-4 text-sm bg-red-900/20 py-2 rounded-lg">{error}</p>}
           </div>
@@ -68,16 +72,16 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="animate-spin text-white mb-4" size={32} />
-            <p className="text-indigo-100 animate-pulse">正在分析您的学业表现...</p>
+            <p className="text-indigo-100 animate-pulse">{t('ai_analyzing')}</p>
           </div>
         )}
 
         {advice && (
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 animate-fade-in">
-            <h4 className="font-semibold text-lg text-white mb-2">学业分析</h4>
+            <h4 className="font-semibold text-lg text-white mb-2">{language === 'zh' ? '学业分析' : 'Analysis'}</h4>
             <p className="text-indigo-50 leading-relaxed mb-6 text-sm">{advice.analysis}</p>
             
-            <h4 className="font-semibold text-lg text-white mb-3">提升建议</h4>
+            <h4 className="font-semibold text-lg text-white mb-3">{language === 'zh' ? '提升建议' : 'Suggestions'}</h4>
             <ul className="space-y-2">
               {advice.suggestions.map((suggestion, index) => (
                 <li key={index} className="flex items-start gap-2 text-sm text-indigo-50">
@@ -92,7 +96,7 @@ export const AiAdvisor: React.FC<AiAdvisorProps> = ({ courses, stats }) => {
                     onClick={() => setAdvice(null)}
                     className="text-xs text-indigo-200 hover:text-white underline decoration-dashed"
                 >
-                    清除分析
+                    {t('ai_clear')}
                 </button>
             </div>
           </div>

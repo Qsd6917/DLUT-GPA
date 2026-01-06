@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calculator, Target, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface TargetGpaCalculatorProps {
   currentGpa: number;
@@ -7,6 +8,7 @@ interface TargetGpaCalculatorProps {
 }
 
 export const TargetGpaCalculator: React.FC<TargetGpaCalculatorProps> = ({ currentGpa, currentCredits }) => {
+  const { t } = useTranslation();
   const [targetGpa, setTargetGpa] = useState<string>('');
   const [remainingCredits, setRemainingCredits] = useState<string>('20');
   const [result, setResult] = useState<{ requiredGpa: number; requiredScore: number; status: 'possible' | 'impossible' | 'easy' } | null>(null);
@@ -49,12 +51,12 @@ export const TargetGpaCalculator: React.FC<TargetGpaCalculatorProps> = ({ curren
         <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
           <Target size={20} />
         </div>
-        <h3 className="text-lg font-bold text-gray-800">目标 GPA 计算器</h3>
+        <h3 className="text-lg font-bold text-gray-800">{t('target_calculator')}</h3>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">设定目标 GPA</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t('set_target')}</label>
           <div className="relative">
              <input
                 type="number"
@@ -73,7 +75,7 @@ export const TargetGpaCalculator: React.FC<TargetGpaCalculatorProps> = ({ curren
         </div>
 
         <div>
-           <label className="block text-xs font-medium text-gray-500 mb-1">剩余学分 (例如：大三下+大四)</label>
+           <label className="block text-xs font-medium text-gray-500 mb-1">{t('remaining_credits')}</label>
            <input
               type="number"
               value={remainingCredits}
@@ -93,7 +95,7 @@ export const TargetGpaCalculator: React.FC<TargetGpaCalculatorProps> = ({ curren
         }`}>
            {!result ? (
                <div className="text-center text-xs text-gray-400 py-2">
-                   输入目标和学分以查看计算结果
+                   {t('calc_input_hint')}
                </div>
            ) : (
                <>
@@ -102,8 +104,8 @@ export const TargetGpaCalculator: React.FC<TargetGpaCalculatorProps> = ({ curren
                           result.status === 'impossible' ? 'text-red-600' : 
                           result.status === 'easy' ? 'text-emerald-600' : 'text-indigo-600'
                       }`}>
-                          {result.status === 'impossible' ? '目标过高' : 
-                           result.status === 'easy' ? '轻松达成' : '挑战目标'}
+                          {result.status === 'impossible' ? t('target_impossible') : 
+                           result.status === 'easy' ? t('target_easy') : t('target_challenge')}
                       </span>
                       {result.status === 'impossible' ? <AlertCircle size={16} className="text-red-500"/> : <Calculator size={16} className="text-indigo-500"/>}
                   </div>
@@ -112,17 +114,17 @@ export const TargetGpaCalculator: React.FC<TargetGpaCalculatorProps> = ({ curren
                       <span className="text-2xl font-extrabold text-gray-900">
                           {result.requiredGpa.toFixed(3)}
                       </span>
-                      <span className="text-xs text-gray-500 mb-1.5 font-medium">需要达到的 GPA</span>
+                      <span className="text-xs text-gray-500 mb-1.5 font-medium">{t('required_gpa')}</span>
                   </div>
 
                   <div className="w-full h-px bg-current opacity-10 my-2"></div>
                   
                   <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-600">平均分需达到:</span>
+                      <span className="text-gray-600">{t('required_score')}:</span>
                       <span className={`font-bold font-mono ${
                           result.requiredScore > 100 ? 'text-red-600' : 'text-gray-900'
                       }`}>
-                          {result.requiredScore.toFixed(1)} 分
+                          {result.requiredScore.toFixed(1)}
                       </span>
                   </div>
                </>

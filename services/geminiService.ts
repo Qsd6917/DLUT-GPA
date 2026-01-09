@@ -136,6 +136,63 @@ export const parseTranscriptFromImage = async (base64Image: string): Promise<Cou
   }
 };
 
+export const parseTranscriptFromPdf = async (base64Pdf: string): Promise<Course[]> => {
+  try {
+    const prompt = `
+      请分析这份 PDF 成绩单文档，并提取所有课程成绩信息。
+      请仔细识别文档中的表格内容，提取以下字段：
+      - semester (学期，格式如 "1-1", "2023-2024-1"，请统一标准化)
+      - name (课程名称)
+      - credits (学分，数字)
+      - score (成绩/分数)。如果成绩是等级制（如"优"、"良"、"通过"），请按以下规则转换：优=95, 良=85, 中=75, 及格=65, 通过=80。如果是数字，直接提取数字。
+      - type (课程属性/性质)。请提取如 "必修", "选修", "任选", "限选" 等字样。如果找不到，默认填 "必修"。
+      
+      请返回一个 JSON 数组。不要包含 markdown 格式标记。
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: "application/pdf",
+              data: base64Pdf,
+            },
+          },
+          {
+            text: prompt,
+          },
+        ],
+      },
+    });
+
+    let jsonStr = response.text || "[]";
+    jsonStr = jsonStr.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    const rawData = JSON.parse(jsonStr);
+    
+    if (Array.isArray(rawData)) {
+        return rawData.map((item: any) => ({
+            id: '', 
+            name: item.name || "未命名课程",
+            credits: Number(item.credits) || 0,
+            score: Number(item.score) || 0,
+            semester: item.semester || "未知学期",
+            type: normalizeCourseType(item.type),
+            gpa: 0,
+            isActive: true
+        }));
+    }
+    
+    return [];
+
+  } catch (error) {
+    console.error("Gemini PDF Parse Error:", error);
+    throw new Error("PDF 解析失败，请确保文件未加密且包含清晰的成绩文本。");
+  }
+};
+
 export const parseTranscriptFromText = async (textData: string): Promise<Course[]> => {
   try {
     const prompt = `

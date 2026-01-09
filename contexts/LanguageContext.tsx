@@ -118,6 +118,20 @@ const translations = {
     wes_desc: 'WES 认证常用算法预览',
     apply_filters: '应用筛选',
     course_list: '课程列表',
+
+    // Default Settings
+    tab_settings: '默认设置',
+    set_as_default: '设为系统默认',
+    set_default_desc: '将当前课程列表保存为“初始化”时的默认状态。',
+    set_default_success: '设置成功！点击“初始化”按钮时将恢复到当前状态。',
+    clear_default: '恢复出厂默认',
+    clear_default_desc: '清除自定义的默认状态，恢复到 DLUT 演示数据。',
+    clear_default_success: '已恢复到出厂默认设置。',
+    
+    // Filters
+    all_types: '全部属性',
+    filter_type: '筛选属性',
+    core_only: '只看核心'
   },
   en: {
     app_title: 'DLUT GPA',
@@ -234,6 +248,20 @@ const translations = {
     wes_desc: 'WES-like calculation preview',
     apply_filters: 'Apply Filters',
     course_list: 'Course List',
+
+    // Default Settings
+    tab_settings: 'Default Settings',
+    set_as_default: 'Set as Default',
+    set_default_desc: 'Save current list as the restore point for Reset.',
+    set_default_success: 'Saved! Resetting will now restore this state.',
+    clear_default: 'Restore Factory Default',
+    clear_default_desc: 'Clear custom default and revert to demo data.',
+    clear_default_success: 'Restored to factory defaults.',
+    
+    // Filters
+    all_types: 'All Types',
+    filter_type: 'Filter Type',
+    core_only: 'Core Only'
   }
 };
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { X, Download, Upload, FileJson, AlertCircle, CheckCircle2, RefreshCw, FileSpreadsheet, ChevronDown, AlertTriangle, ArrowRight, XCircle, Image as ImageIcon, Loader2, Sparkles, Code, ClipboardCopy, QrCode, Scan } from 'lucide-react';
+import { X, Download, Upload, FileJson, AlertCircle, CheckCircle2, RefreshCw, FileSpreadsheet, ChevronDown, AlertTriangle, ArrowRight, XCircle, Image as ImageIcon, Loader2, Sparkles, Code, ClipboardCopy, QrCode, Scan, FileText, Settings, Save, Trash2 } from 'lucide-react';
 import { Course } from '../types';
-import { parseTranscriptFromImage, parseTranscriptFromText } from '../services/geminiService';
+import { parseTranscriptFromImage, parseTranscriptFromText, parseTranscriptFromPdf } from '../services/geminiService';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import LZString from 'lz-string';
@@ -39,7 +39,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
   const [exportSemester, setExportSemester] = useState<string>('all');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   // Get unique semesters for export dropdown
   const semesters = useMemo(() => {
@@ -364,9 +364,9 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
     reader.readAsText(file);
   };
 
-  const handleImageUpload = (file: File) => {
-      if (!file.type.startsWith('image/')) {
-          setImportError("请上传有效的图片文件 (PNG, JPG)");
+  const handleAiFileUpload = (file: File) => {
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+          setImportError("请上传有效的图片或 PDF 文件");
           return;
       }
 
@@ -377,10 +377,16 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
       reader.onload = async (e) => {
           try {
               const base64Data = (e.target?.result as string).split(',')[1];
-              const courses = await parseTranscriptFromImage(base64Data);
+              let courses: Course[] = [];
+              
+              if (file.type === 'application/pdf') {
+                   courses = await parseTranscriptFromPdf(base64Data);
+              } else {
+                   courses = await parseTranscriptFromImage(base64Data);
+              }
               
               if (courses.length === 0) {
-                  throw new Error("未能识别出有效的课程数据，请确保图片清晰且包含表格。");
+                  throw new Error("未能识别出有效的课程数据，请确保文件清晰且包含成绩表格。");
               }
 
               setImportData(courses);
@@ -435,8 +441,8 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
         const file = e.dataTransfer.files[0];
-        if (file.type.startsWith('image/')) {
-            handleImageUpload(file);
+        if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+            handleAiFileUpload(file);
         } else {
             parseFile(file);
         }
@@ -547,7 +553,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                 >
                     <div className="flex items-center justify-center gap-2">
                         <Download size={16} />
-                        备份导出
+                        备份
                     </div>
                     {activeTab === 'export' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
                 </button>
@@ -557,7 +563,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                 >
                     <div className="flex items-center justify-center gap-2">
                         <Upload size={16} />
-                        恢复导入
+                        导入
                     </div>
                     {activeTab === 'import' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
                 </button>
@@ -763,23 +769,25 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({ isOpen
                     {!importData ? (
                         <>
                         <div className="grid grid-cols-2 gap-3 mb-4">
-                            {/* Image Import (Left) */}
+                            {/* Image/PDF Import (Left) */}
                             <div 
                                 className={`border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer relative overflow-hidden group flex flex-col items-center justify-center ${isAnalyzing ? 'opacity-50 pointer-events-none' : ''} border-purple-200 hover:border-purple-400 hover:bg-purple-50`}
-                                onClick={() => !isAnalyzing && imageInputRef.current?.click()}
+                                onClick={() => !isAnalyzing && aiFileInputRef.current?.click()}
                             >
                                 <input 
                                     type="file" 
-                                    ref={imageInputRef} 
+                                    ref={aiFileInputRef} 
                                     className="hidden" 
-                                    accept="image/*" 
-                                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
+                                    accept="image/*,application/pdf" 
+                                    onChange={(e) => e.target.files?.[0] && handleAiFileUpload(e.target.files[0])} 
                                 />
-                                <div className="bg-purple-100 p-2 rounded-full mb-2 text-purple-600 group-hover:scale-110 transition-transform">
-                                    <ImageIcon size={20} />
+                                <div className="bg-purple-100 p-2 rounded-full mb-2 text-purple-600 group-hover:scale-110 transition-transform flex items-center gap-1">
+                                    <ImageIcon size={18} />
+                                    <span className="text-purple-300">/</span>
+                                    <FileText size={18} />
                                 </div>
-                                <h4 className="text-sm font-bold text-purple-900">成绩单截图</h4>
-                                <p className="text-[10px] text-purple-600 mt-1">上传图片识别</p>
+                                <h4 className="text-sm font-bold text-purple-900">成绩单文件</h4>
+                                <p className="text-[10px] text-purple-600 mt-1">支持 图片/PDF 识别</p>
                             </div>
 
                             {/* Standard File Import (Right) */}

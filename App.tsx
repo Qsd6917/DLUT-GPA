@@ -9,16 +9,16 @@ import { DataManagementModal } from './components/DataManagementModal';
 import { ShareableReportModal } from './components/ShareableReportModal';
 import { StatsCard } from './components/StatsCard';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
-import { AiAdvisor } from './components/AiAdvisor';
 import { TargetGpaCalculator } from './components/TargetGpaCalculator';
 import { GraduationProgress } from './components/GraduationProgress';
 import { ApplicationCalculator } from './components/ApplicationCalculator';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2, Languages, FlaskConical, XCircle, Save, Calculator } from 'lucide-react';
+import { GraduationCap, Award, Book, Settings, Percent, Search, Database, RotateCcw, Filter, ChevronDown, Check, Sparkles, PieChart as PieChartIcon, Share2, Languages, FlaskConical, XCircle, Save, Calculator, Star } from 'lucide-react';
 import { useTranslation } from './contexts/LanguageContext';
 
 const COLORS = ['#10B981', '#005BAC', '#F59E0B', '#EF4444', '#6B7280'];
 const STORAGE_KEY = 'dlut_gpa_courses_v3';
+const USER_DEFAULT_KEY = 'dlut_gpa_user_default';
 
 function App() {
   const { t, language, setLanguage } = useTranslation();
@@ -26,8 +26,15 @@ function App() {
   const [method, setMethod] = useState<CalculationMethod>(DEFAULT_CALCULATION_METHOD);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSemesters, setSelectedSemesters] = useState<string[]>([]);
+  
+  // Advanced Filter State
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  
+  const [isTypeFilterDropdownOpen, setIsTypeFilterDropdownOpen] = useState(false);
+  const typeFilterRef = useRef<HTMLDivElement>(null);
+  const [filterType, setFilterType] = useState<'ALL' | CourseType>('ALL');
+  const [filterCore, setFilterCore] = useState(false);
   
   // Sandbox State
   const [isSandboxMode, setIsSandboxMode] = useState(false);
@@ -49,6 +56,9 @@ function App() {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setIsFilterDropdownOpen(false);
       }
+      if (typeFilterRef.current && !typeFilterRef.current.contains(event.target as Node)) {
+        setIsTypeFilterDropdownOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -67,11 +77,23 @@ function App() {
       }
     }
 
+    // If no active data, check for User Default or fallback to Sample
     if (initialCourses.length === 0) {
-        initialCourses = SAMPLE_COURSES.map(c => ({
-            ...c,
-            gpa: calculateCourseGpa(c.score, DEFAULT_CALCULATION_METHOD),
-        }));
+        const userDefault = localStorage.getItem(USER_DEFAULT_KEY);
+        if (userDefault) {
+            try {
+                initialCourses = JSON.parse(userDefault);
+            } catch (e) {
+                initialCourses = [];
+            }
+        }
+        
+        if (initialCourses.length === 0) {
+            initialCourses = SAMPLE_COURSES.map(c => ({
+                ...c,
+                gpa: calculateCourseGpa(c.score, DEFAULT_CALCULATION_METHOD),
+            }));
+        }
     } else {
         // Migration: Ensure 'type' and 'isCore' exists for old data
         initialCourses = initialCourses.map(c => ({
@@ -153,7 +175,7 @@ function App() {
   };
 
   const handleToggleAll = (checked: boolean) => {
-    if (searchTerm || selectedSemesters.length > 0) {
+    if (searchTerm || selectedSemesters.length > 0 || filterType !== 'ALL' || filterCore) {
         const visibleIds = new Set(filteredCourses.map(c => c.id));
         setCourses(courses.map(c => visibleIds.has(c.id) ? { ...c, isActive: checked } : c));
     } else {
@@ -186,13 +208,24 @@ function App() {
   const handleResetToDefault = () => {
     if (window.confirm(t('confirm_reset'))) {
         localStorage.removeItem(STORAGE_KEY);
-        const defaultCourses = SAMPLE_COURSES.map(c => ({
-            ...c,
-            gpa: calculateCourseGpa(c.score, method),
-        }));
+        // We removed the user default logic UI, but checking it here is harmless as fallback.
+        // Primarily it will fall back to SAMPLE_COURSES which is now updated.
+        
+        let defaultCourses: Course[] = [];
+        
+        // Fallback to factory samples (which are now updated with user data)
+        if (defaultCourses.length === 0) {
+            defaultCourses = SAMPLE_COURSES.map(c => ({
+                ...c,
+                gpa: calculateCourseGpa(c.score, method),
+            }));
+        }
+
         setCourses(defaultCourses);
         setSelectedSemesters([]);
         setSearchTerm('');
+        setFilterType('ALL');
+        setFilterCore(false);
     }
   };
 
@@ -231,16 +264,28 @@ function App() {
   const filteredCourses = useMemo(() => {
     let result = courses;
     
+    // Semester
     if (selectedSemesters.length > 0) {
         result = result.filter(c => selectedSemesters.includes(c.semester));
     }
     
+    // Type
+    if (filterType !== 'ALL') {
+        result = result.filter(c => c.type === filterType);
+    }
+    
+    // Core
+    if (filterCore) {
+        result = result.filter(c => c.isCore);
+    }
+
+    // Search
     if (searchTerm.trim()) {
         result = result.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }
     
     return result;
-  }, [courses, searchTerm, selectedSemesters]);
+  }, [courses, searchTerm, selectedSemesters, filterType, filterCore]);
 
   const activeCourses = useMemo(() => filteredCourses.filter(c => c.isActive), [filteredCourses]);
   const stats = useMemo(() => calculateStats(activeCourses), [activeCourses]);
@@ -254,13 +299,19 @@ function App() {
       if (selectedSemesters.length > 0) {
         filteredOriginal = filteredOriginal.filter(c => selectedSemesters.includes(c.semester));
       }
+      if (filterType !== 'ALL') {
+        filteredOriginal = filteredOriginal.filter(c => c.type === filterType);
+      }
+      if (filterCore) {
+        filteredOriginal = filteredOriginal.filter(c => c.isCore);
+      }
       if (searchTerm.trim()) {
         filteredOriginal = filteredOriginal.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
       }
       
       const activeOriginal = filteredOriginal.filter(c => c.isActive);
       return calculateStats(activeOriginal);
-  }, [isSandboxMode, originalCourses, selectedSemesters, searchTerm]);
+  }, [isSandboxMode, originalCourses, selectedSemesters, searchTerm, filterType, filterCore]);
 
   const toggleLanguage = () => {
       setLanguage(language === 'zh' ? 'en' : 'zh');
@@ -468,50 +519,101 @@ function App() {
                 existingSemesters={semesters}
             />
             
-            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl shadow-soft border relative z-20 transition-all hover:shadow-md ${isSandboxMode ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100/50'}`}>
-                {/* Multi-select Filter */}
-                <div className="relative" ref={filterRef}>
-                    <button 
-                        onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-semibold shadow-sm ${isSandboxMode ? 'bg-white border-amber-200 text-amber-900 hover:bg-amber-100' : 'bg-gray-50 hover:bg-white border-gray-200 hover:border-blue-300 hover:text-dlut-blue text-gray-700'}`}
-                    >
-                        <Filter size={15} />
-                        <span>
-                            {selectedSemesters.length === 0 
-                                ? t('all_semesters')
-                                : t('selected_semesters', selectedSemesters.length)}
-                        </span>
-                        <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
+            <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl shadow-soft border relative z-20 transition-all hover:shadow-md ${isSandboxMode ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100/50'}`}>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Semester Filter */}
+                    <div className="relative" ref={filterRef}>
+                        <button 
+                            onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-semibold shadow-sm ${isSandboxMode ? 'bg-white border-amber-200 text-amber-900 hover:bg-amber-100' : 'bg-gray-50 hover:bg-white border-gray-200 hover:border-blue-300 hover:text-dlut-blue text-gray-700'}`}
+                        >
+                            <Filter size={15} />
+                            <span>
+                                {selectedSemesters.length === 0 
+                                    ? t('all_semesters')
+                                    : t('selected_semesters', selectedSemesters.length)}
+                            </span>
+                            <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
 
-                    {isFilterDropdownOpen && (
-                        <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/5">
-                             <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">{t('filter_semester')}</div>
-                             <div 
-                                onClick={() => setSelectedSemesters([])}
-                                className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm mb-1 transition-colors ${selectedSemesters.length === 0 ? 'bg-blue-50 text-dlut-blue font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
-                             >
-                                <span>{t('all_semesters')}</span>
-                                {selectedSemesters.length === 0 && <Check size={16} />}
-                             </div>
-                             <div className="h-px bg-gray-100 my-1"></div>
-                             <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-                                 {semesters.map(sem => (
-                                     <div 
-                                        key={sem}
-                                        onClick={() => toggleSemester(sem)}
-                                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm mb-1 transition-colors ${selectedSemesters.includes(sem) ? 'bg-blue-50 text-dlut-blue font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
-                                     >
-                                         <span className="truncate">{sem}</span>
-                                         {selectedSemesters.includes(sem) && <Check size={16} />}
-                                     </div>
-                                 ))}
-                             </div>
-                        </div>
-                    )}
+                        {isFilterDropdownOpen && (
+                            <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/5">
+                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">{t('filter_semester')}</div>
+                                <div 
+                                    onClick={() => setSelectedSemesters([])}
+                                    className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm mb-1 transition-colors ${selectedSemesters.length === 0 ? 'bg-blue-50 text-dlut-blue font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                                >
+                                    <span>{t('all_semesters')}</span>
+                                    {selectedSemesters.length === 0 && <Check size={16} />}
+                                </div>
+                                <div className="h-px bg-gray-100 my-1"></div>
+                                <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                                    {semesters.map(sem => (
+                                        <div 
+                                            key={sem}
+                                            onClick={() => toggleSemester(sem)}
+                                            className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm mb-1 transition-colors ${selectedSemesters.includes(sem) ? 'bg-blue-50 text-dlut-blue font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
+                                        >
+                                            <span className="truncate">{sem}</span>
+                                            {selectedSemesters.includes(sem) && <Check size={16} />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Type Filter */}
+                    <div className="relative" ref={typeFilterRef}>
+                         <button 
+                            onClick={() => setIsTypeFilterDropdownOpen(!isTypeFilterDropdownOpen)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-semibold shadow-sm ${isSandboxMode ? 'bg-white border-amber-200 text-amber-900 hover:bg-amber-100' : 'bg-gray-50 hover:bg-white border-gray-200 hover:border-blue-300 hover:text-dlut-blue text-gray-700'}`}
+                        >
+                            <Book size={15} />
+                            <span>
+                                {filterType === 'ALL' ? t('all_types') : t(`type_${filterType === '必修' ? 'compulsory' : filterType === '选修' ? 'elective' : 'optional'}` as any)}
+                            </span>
+                            <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isTypeFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isTypeFilterDropdownOpen && (
+                            <div className="absolute top-full left-0 mt-2 w-40 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/5">
+                                <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">{t('filter_type')}</div>
+                                {['ALL', '必修', '选修', '任选'].map((type) => (
+                                    <div 
+                                        key={type}
+                                        onClick={() => {
+                                            setFilterType(type as any);
+                                            setIsTypeFilterDropdownOpen(false);
+                                        }}
+                                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm mb-1 transition-colors ${filterType === type ? 'bg-blue-50 text-dlut-blue font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                                    >
+                                        <span>{type === 'ALL' ? t('all_types') : t(`type_${type === '必修' ? 'compulsory' : type === '选修' ? 'elective' : 'optional'}` as any)}</span>
+                                        {filterType === type && <Check size={16} />}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Core Filter Toggle */}
+                    <button 
+                        onClick={() => setFilterCore(!filterCore)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-semibold shadow-sm ${
+                            filterCore 
+                                ? 'bg-yellow-50 border-yellow-200 text-yellow-700 ring-1 ring-yellow-200' 
+                                : isSandboxMode 
+                                    ? 'bg-white border-amber-200 text-amber-900 hover:bg-amber-100'
+                                    : 'bg-gray-50 hover:bg-white border-gray-200 hover:border-yellow-300 hover:text-yellow-600 text-gray-700'
+                        }`}
+                    >
+                        <Star size={15} className={filterCore ? 'fill-yellow-600' : ''} />
+                        <span>{t('core_only')}</span>
+                    </button>
                 </div>
                 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="relative w-full sm:w-64 group">
                         <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-dlut-blue transition-colors" size={16} />
                         <input 
@@ -616,7 +718,6 @@ function App() {
             <AnalysisDashboard courses={activeCourses} />
             <TargetGpaCalculator currentGpa={stats.weightedGpa} currentCredits={stats.totalCredits} />
             <GraduationProgress courses={activeCourses} totalCredits={stats.totalCredits} />
-            <AiAdvisor courses={activeCourses} stats={stats} />
           </div>
         </div>
       </main>

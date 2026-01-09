@@ -67,7 +67,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
                     list="edit-semester-list"
                     value={semester}
                     onChange={(e) => setSemester(e.target.value)}
-                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
                 <datalist id="edit-semester-list">
                     {existingSemesters.map(s => <option key={s} value={s} />)}
@@ -78,7 +78,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
                 <select
                     value={type}
                     onChange={(e) => setType(e.target.value as CourseType)}
-                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 >
                     <option value="必修">必修</option>
                     <option value="选修">选修</option>
@@ -93,7 +93,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+              className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
             />
           </div>
           
@@ -106,7 +106,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
                 onChange={(e) => setCredits(e.target.value)}
                 step="0.5"
                 min="0"
-                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
               />
             </div>
             <div>
@@ -117,7 +117,7 @@ export const EditCourseModal: React.FC<EditCourseModalProps> = ({ course, isOpen
                 onChange={(e) => setScore(e.target.value)}
                 min="0"
                 max="100"
-                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
               />
             </div>
           </div>
